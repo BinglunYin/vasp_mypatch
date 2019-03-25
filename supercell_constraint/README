@@ -45,6 +45,6 @@ Create a Patch:
 diff -urN  vasp.5.4.4_s  vasp.5.4.4  > mypatch
 
 Apply a Patch:
-cd vasp.5.4.4
+cd vasp.5.4.4_s2
 patch -p1  <  ../mypatch
 
