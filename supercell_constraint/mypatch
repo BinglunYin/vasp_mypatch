@@ -1,0 +1,310 @@
+diff -urN vasp.5.4.4_s/src/constr_cell_relax.F vasp.5.4.4/src/constr_cell_relax.F
+--- vasp.5.4.4_s/src/constr_cell_relax.F	2017-04-20 11:03:55.000000000 +0200
++++ vasp.5.4.4/src/constr_cell_relax.F	2019-03-25 16:32:46.882204566 +0100
+@@ -24,19 +24,135 @@
+ !
+ !-----------------------------------------------------------------------
+ 
+-      SUBROUTINE CONSTR_CELL_RELAX(FCELL)
++      SUBROUTINE CONSTR_CELL_RELAX(FCELL, qe, v, FACTSI)
++
+       USE prec
+       REAL(q) FCELL(3,3)
++      REAL(q) qe, v, FACTSI
++      REAL(q) tp(6), tp2(6)
++      INTEGER modeid, i
++
++
++      
++      open(unit=101, status='old', file="Y_CONSTR_LATT")
++      read(101,*) modeid
++      read(101,*)(tp(i),i=1,6)
++      close(unit=101)
++
++
++
++      open(unit=100, status='replace', file="y_constr_latt")
++
++      write(100,*) "# This subroutine relaxes lattice in various ways."
++      write(100,*) "# "
++      write(100,*) "# format of the input file, Y_CONSTR_LATT"
++      write(100,*) "# modeid (stress component(s) to be relaxed)"
++      write(100,*) "# target pressure: tp(i),i=1,6"
++      write(100,*) "# "
++      write(100,*) "# OUTCAR gives pressure, -stress, in kB."
++      write(100,*) "# XX   YY   ZZ   XY   YZ   ZX"
++      write(100,*) "# "
++      write(100,*) "# modeid=3: relax sigma_33"
++      write(100,*) "#      356: relax sigma_3j by tilting a3"
++      write(100,*) "#      123: relax sigma_ii"
++      write(100,*) "# else    : default mode "
++      write(100,*) "# "
++      write(100,*) "# Usually, dA(i,j)=F(k,j)*A(i,k) "
++      write(100,*) "# if transpose A and F, dA'(j,i)=F'(j,k)*A'(k,i) "
++      write(100,*) "# therefore, FCELL=F' "
++      write(100,*) "# "
++      write(100,*) "# Modified by B. Yin, 2017-05-01"
++
++      write(100,*) " "
++      write(100,*) "FCELL:"
++      do i=1, 3, 1
++          write(100,"(3ES18.8)") FCELL(1,i), FCELL(2,i), FCELL(3,i)
++      end do
++
++      write(100,*) " "
++      write(100,*) "qe, v, FACTSI:"
++      write(100,"(3ES18.8)") qe, v, FACTSI
++
++      write(100,*) " "
++      write(100,*) "modeid:"
++      write(100,"(1I8)") modeid
++
++      write(100,*) " "
++      write(100,*) "tp(i):"
++      do i=1, 6, 1
++          tp2(i)= tp(i) /(qe*1E22_q)*v*FACTSI
++          write(100,"(2ES18.8)")  tp(i), tp2(i)
++      end do
++
++
++
++
++      ! symmetrize
++  
++      FCELL(1,2)= ( FCELL(1,2)+FCELL(2,1) )/2
++      FCELL(1,3)= ( FCELL(1,3)+FCELL(3,1) )/2
++      FCELL(2,3)= ( FCELL(2,3)+FCELL(3,2) )/2
++
++      FCELL(2,1)= FCELL(1,2)
++      FCELL(3,1)= FCELL(1,3)
++      FCELL(3,2)= FCELL(2,3)
++
++
++
++
++      ! apply constraint
++
++      IF (modeid == 3) THEN
++                       
++      SAVE=FCELL(3,3)
++      FCELL=0   ! F90 style: set the whole array to zero
++      FCELL(3,3)=SAVE -tp2(3)
++
++
++
++      ELSE IF (modeid == 356) THEN
++
++      FCELL(1,3)=FCELL(1,3)+FCELL(3,1) -tp2(6)*2   
++      FCELL(2,3)=FCELL(2,3)+FCELL(3,2) -tp2(5)*2
++      FCELL(3,3)=FCELL(3,3) -tp2(3)
++          
++      FCELL(1,1)=0   
++      FCELL(2,1)=0 
++      FCELL(3,1)=0   
++
++      FCELL(1,2)=0   
++      FCELL(2,2)=0   
++      FCELL(3,2)=0
++              
++
++
++      ELSE IF (modeid == 123 ) THEN
++
++      FCELL(1,1)= FCELL(1,1) -tp2(1)
++      FCELL(2,2)= FCELL(2,2) -tp2(2)
++      FCELL(3,3)= FCELL(3,3) -tp2(3)
++
++      FCELL(1,2)=0
++      FCELL(2,1)=0
++      FCELL(1,3)=0
++      FCELL(3,1)=0
++      FCELL(2,3)=0
++      FCELL(3,2)=0
++
++      END IF
++
++
++
++
++      write(100,*) " "
++      write(100,*) "FCELL after modification:"
++      do i=1, 3, 1
++          write(100,"(3ES18.8)") FCELL(1,i), FCELL(2,i), FCELL(3,i)
++      end do
++
++      close(unit=100)
++
+ 
+-!     just one simple example
+-!     relaxation in x directions only
+-!      SAVE=FCELL(1,1)
+-!      FCELL=0   ! F90 style: set the whole array to zero
+-!      FCELL(1,1)=SAVE
+-!     relaxation in z direction only
+-!      SAVE=FCELL(3,3)
+-!      FCELL=0   ! F90 style: set the whole array to zero
+-!      FCELL(3,3)=SAVE
+ 
+       RETURN
+       END SUBROUTINE
+diff -urN vasp.5.4.4_s/src/dyna.F vasp.5.4.4/src/dyna.F
+--- vasp.5.4.4_s/src/dyna.F	2017-04-20 11:03:56.000000000 +0200
++++ vasp.5.4.4/src/dyna.F	2019-03-25 16:32:46.882204566 +0100
+@@ -1243,16 +1243,36 @@
+             DO M=1,3
+               VTMP(M)=TIFOR(M,NI)
+             ENDDO
+-            CALL KARDIR(1,VTMP,LATT_CUR%B)
++
++
++! ===================================
++! modified by B. Yin, 2018-08-20
++! comment two lines below to make
++! the Selective Dynamics work on C
++! ===================================
++
++
++!            CALL KARDIR(1,VTMP,LATT_CUR%B)
+             DO M=1,3
+               IF (.NOT.T_INFO%LSFOR(M,NI)) VTMP(M)=0._q
+             ENDDO
+-            CALL DIRKAR(1,VTMP,LATT_CUR%A)
++!            CALL DIRKAR(1,VTMP,LATT_CUR%A)
+             DO M=1,3
+               TIFOR(M,NI)=VTMP(M)
+             ENDDO
+          ENDDO
+       ENDIF
++
++
++! ===================================
++! modified by B. Yin, 2018-08-20
++! to call Y_MAX_FORCE
++! ===================================
++
++      CALL Y_MAX_FORCE(T_INFO%NIONS,TIFOR)
++
++
++
+       END SUBROUTINE
+ 
+ 
+diff -urN vasp.5.4.4_s/src/main.F vasp.5.4.4/src/main.F
+--- vasp.5.4.4_s/src/main.F	2017-04-20 11:03:58.000000000 +0200
++++ vasp.5.4.4/src/main.F	2019-03-25 16:32:46.882204566 +0100
+@@ -3556,7 +3556,20 @@
+            ENDDO
+         ENDIF
+ 
+-        CALL CONSTR_CELL_RELAX(D2SIF)
++
++
++!================================
++! modified by B. Yin, 2018-08-20
++! for different cell relax
++!================================
++
++!        CALL CONSTR_CELL_RELAX(D2SIF)
++
++        CALL CONSTR_CELL_RELAX(D2SIF, EVTOJ, LATT_CUR%OMEGA, FACTSI)
++
++!================================
++
++
+ 
+         IF (FACTSI/=0) THEN
+            DO I=1,3
+diff -urN vasp.5.4.4_s/src/.objects vasp.5.4.4/src/.objects
+--- vasp.5.4.4_s/src/.objects	2017-04-20 11:04:05.000000000 +0200
++++ vasp.5.4.4/src/.objects	2019-03-25 16:33:30.646966091 +0100
+@@ -19,6 +19,7 @@
+ 	xclib.o \
+ 	vdw_nl.o \
+ 	xclib_grad.o \
++	y_max_force.o \
+ 	radial.o \
+ 	pseudo.o \
+ 	gridq.o \
+diff -urN vasp.5.4.4_s/src/y_max_force.F vasp.5.4.4/src/y_max_force.F
+--- vasp.5.4.4_s/src/y_max_force.F	1970-01-01 01:00:00.000000000 +0100
++++ vasp.5.4.4/src/y_max_force.F	2019-03-25 16:32:46.882204566 +0100
+@@ -0,0 +1,79 @@
++!-----------------------------------------------------------------------
++!
++! This subroutine outputs force info
++! 1. Add one line:
++!       CALL Y_MAX_FORCE(T_INFO%NIONS,TIFOR)
++!       at the end of subroutine, SET_SELECTED_FORCES_ZERO, in dyna.F 
++! 2. Modify .objects
++!
++! Created by B. Yin, 2017-05-27
++!
++!-----------------------------------------------------------------------
++
++
++
++      SUBROUTINE Y_MAX_FORCE(natoms, TIFOR)
++      USE prec
++      
++      integer   natoms
++      REAL(q)   TIFOR(3,natoms) 
++
++      INTEGER   i, j, Fmax_i, Fmax_j, Fnmax_i
++      Real(q)   Fmax, Fnmax, Fn
++
++
++      
++
++      Fmax=0
++      do i=1, natoms, 1
++          do j=1,3,1
++              if (abs(TIFOR(j,i))>Fmax)  then
++                  Fmax=abs(TIFOR(j,i))
++                  Fmax_i=i
++                  Fmax_j=j
++              end if
++          end do
++      end do  
++
++
++      Fnmax=0
++      do i=1, natoms, 1
++          Fn=sqrt( TIFOR(1,i)**2 +TIFOR(2,i)**2 +TIFOR(3,i)**2 )
++          if (Fn>Fnmax)  then
++              Fnmax=Fn
++              Fnmax_i=i
++          end if
++      end do
++          
++
++
++
++      open(unit=100, status='replace', file="y_max_force")
++      write(100,*) "VASP forces after constraint"
++
++      write(100,*) " "
++      write(100,*) "natoms:"
++      write(100,"(1I8)") natoms
++
++      write(100,*) " "
++      write(100,*) "max F component:"
++      write(100,"(2I8, 1F16.8)") Fmax_i, Fmax_j, Fmax
++
++      write(100,*) " "
++      write(100,*) "max F norm:"
++      write(100,"(1I8, 1F16.8)") Fnmax_i, Fnmax
++
++      write(100,*) " "
++      write(100,*) "TIFOR:"
++      do i=1, natoms, 1
++          write(100,"(1I8, 3F16.8)") i, TIFOR(1,i), TIFOR(2,i), TIFOR(3,i)
++      end do
++
++
++      close(unit=100)
++
++
++
++      RETURN
++      END SUBROUTINE
++

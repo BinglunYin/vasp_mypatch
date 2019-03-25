@@ -1,0 +1,50 @@
+
+VASP version:
+5.4.4
+
+Functionalities: 
+1. Controlling the supercell relaxations in various ways.
+2. Switching the "Selective Dynamics" to work on C, instead of D.
+
+Examples: 
+# Calculate the stable SF and the gamma line using the tilted-cell method:
+B Yin, Z Wu, WA Curtin, Acta Materialia 123, 223-234, 2017
+
+# Calculate the gamma line under applied stress using the tilted-cell method:
+P Andric, B Yin, WA Curtin, Journal of the Mechanics and Physics of Solids 122, 262-279, 2019
+
+
+
+One extra input file is needed, Y_CONSTR_LATT. An example is given.
+
+The format of the input file, 
+modeid (stress component(s) to be relaxed)
+target pressure: tp(i),i=1,6
+The order is the same as that in OUTCAR,  XX   YY   ZZ   XY   YZ   ZX, which is pressure, -stress, in kB.
+ 
+modeid=3: relax sigma_33
+     356: relax sigma_3j by tilting a3
+     123: relax sigma_ii
+    else: default mode
+
+
+
+If you have any questions, please feel free to contact me. 
+binglun.yin@epfl.ch
+
+
+
+Best wishes,
+Binglun Yin
+2019-03-25
+
+
+
+Notes:
+Create a Patch:
+diff -urN  vasp.5.4.4_s  vasp.5.4.4  > mypatch
+
+Apply a Patch:
+cd vasp.5.4.4
+patch -p1  <  ../mypatch
+
